@@ -8,8 +8,8 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'https://seongraekids-client.hyphen.it.com',
-      'http://localhost:5173',
-      'http://localhost:4173',
+      /^http:\/\/localhost:\d+$/,
+      /^http:\/\/127\.0\.0\.1:\d+$/,
     ],
     credentials: true,
   });
