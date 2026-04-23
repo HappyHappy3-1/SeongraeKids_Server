@@ -77,7 +77,10 @@ export class PortfolioService {
     }
 
     const filePath = this.buildFilePath(userId);
-    const { error: uploadError } = await client.storage
+    const storageClient = this.supabaseService.hasServiceRoleKey
+      ? this.supabaseService.createAdminClient()
+      : client;
+    const { error: uploadError } = await storageClient.storage
       .from(this.portfolioBucket)
       .upload(filePath, file.buffer, {
         contentType: 'application/pdf',
@@ -103,7 +106,9 @@ export class PortfolioService {
       .single();
 
     if (error || !data) {
-      await client.storage.from(this.portfolioBucket).remove([filePath]);
+      await storageClient.storage
+        .from(this.portfolioBucket)
+        .remove([filePath]);
       throw new BadRequestException(
         `Failed to save portfolio metadata: ${error?.message ?? 'Unknown error'}`,
       );
@@ -195,9 +200,13 @@ export class PortfolioService {
     }
 
     const signedUrlExpiresIn = expiresIn ?? this.defaultSignedUrlExpiresIn;
-    const { data: signedUrlData, error: signedUrlError } = await client.storage
-      .from(this.portfolioBucket)
-      .createSignedUrl(portfolio.file_path, signedUrlExpiresIn);
+    const storageClient = this.supabaseService.hasServiceRoleKey
+      ? this.supabaseService.createAdminClient()
+      : client;
+    const { data: signedUrlData, error: signedUrlError } =
+      await storageClient.storage
+        .from(this.portfolioBucket)
+        .createSignedUrl(portfolio.file_path, signedUrlExpiresIn);
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
       throw new BadRequestException(

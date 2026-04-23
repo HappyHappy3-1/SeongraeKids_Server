@@ -11,6 +11,26 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
+  private async upsertProfile(
+    userId: string,
+    patch: { role?: SupabaseRole; name?: string; email?: string },
+  ) {
+    if (!this.supabaseService.hasServiceRoleKey) return;
+    const admin = this.supabaseService.createAdminClient();
+    const payload: Record<string, unknown> = { id: userId };
+    if (patch.role !== undefined) payload.role = patch.role;
+    if (patch.name !== undefined) payload.name = patch.name;
+    if (patch.email !== undefined) payload.school_email = patch.email;
+    const { error } = await admin
+      .from('profiles')
+      .upsert(payload, { onConflict: 'id' });
+    if (error) {
+      throw new BadRequestException(
+        `Failed to upsert profile: ${error.message}`,
+      );
+    }
+  }
+
   async signUp(dto: SignUpDto) {
     const metadata: Record<string, unknown> = {};
     if (dto.name) metadata.name = dto.name;
@@ -26,6 +46,14 @@ export class AuthService {
 
     if (error) {
       throw new BadRequestException(error.message);
+    }
+
+    if (data.user?.id) {
+      await this.upsertProfile(data.user.id, {
+        role: dto.role ?? 'student',
+        name: dto.name ?? dto.email.split('@')[0],
+        email: dto.email,
+      });
     }
 
     return {
@@ -90,6 +118,15 @@ export class AuthService {
       throw new BadRequestException(
         `Supabase PUT /auth/v1/user failed: ${detail}`,
       );
+    }
+
+    if (body.id) {
+      const meta =
+        (body as { user_metadata?: { email?: string; name?: string } })
+          .user_metadata ?? {};
+      const email = (body as { email?: string }).email ?? meta.email;
+      const name = meta.name ?? (email ? email.split('@')[0] : undefined);
+      await this.upsertProfile(body.id, { role, email, name });
     }
     return { role, user: body };
   }

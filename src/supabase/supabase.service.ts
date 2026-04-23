@@ -7,6 +7,8 @@ import { SUPABASE_CLIENT } from './supabase.constants';
 export class SupabaseService {
   private readonly supabaseUrl: string;
   private readonly supabaseAnonKey: string;
+  private readonly supabaseServiceRoleKey: string | null;
+  private adminClientCache: SupabaseClient | null = null;
 
   constructor(
     @Inject(SUPABASE_CLIENT)
@@ -29,6 +31,8 @@ export class SupabaseService {
 
     this.supabaseUrl = url;
     this.supabaseAnonKey = anonKey;
+    this.supabaseServiceRoleKey =
+      this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY') ?? null;
   }
 
   get client() {
@@ -47,5 +51,25 @@ export class SupabaseService {
         },
       },
     });
+  }
+
+  get hasServiceRoleKey(): boolean {
+    return !!this.supabaseServiceRoleKey;
+  }
+
+  createAdminClient(): SupabaseClient {
+    if (!this.supabaseServiceRoleKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
+    }
+    if (!this.adminClientCache) {
+      this.adminClientCache = createClient(
+        this.supabaseUrl,
+        this.supabaseServiceRoleKey,
+        {
+          auth: { persistSession: false, autoRefreshToken: false },
+        },
+      );
+    }
+    return this.adminClientCache;
   }
 }
