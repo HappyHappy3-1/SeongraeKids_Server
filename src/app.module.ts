@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ClassroomModule } from './classroom/classroom.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     }),
     AuthModule,
     PortfolioModule,
+    ClassroomModule,
   ],
   controllers: [AppController],
   providers: [AppService],
