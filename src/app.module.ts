@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { AppService } from './app.service';
       envFilePath: ['.env.local', '.env'],
     }),
     AuthModule,
+    PortfolioModule,
   ],
   controllers: [AppController],
   providers: [AppService],

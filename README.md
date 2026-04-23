@@ -25,6 +25,27 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Portfolio API
+
+This backend now includes portfolio PDF APIs with Supabase auth and role-based access.
+
+- `POST /portfolio/me`: student uploads a PDF
+- `GET /portfolio/me`: student reads own portfolio list
+- `GET /portfolio`: teacher reads all student portfolios
+- `GET /portfolio/:portfolioId/download-url`: signed URL for download
+
+Required environment variables (optional values shown with defaults):
+
+- `SUPABASE_PORTFOLIO_TABLE=portfolios`
+- `SUPABASE_PROFILE_TABLE=profiles`
+- `SUPABASE_PORTFOLIO_BUCKET=portfolios`
+- `PORTFOLIO_MAX_FILE_SIZE_BYTES=10485760`
+- `PORTFOLIO_SIGNED_URL_EXPIRES_IN=300`
+
+Supabase schema and RLS reference:
+
+- `docs/portfolio-schema.sql`
+
 ## Project setup
 
 ```bash
