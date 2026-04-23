@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+
+export type SupabaseRole = 'student' | 'teacher' | 'homeroom_teacher';
+
+export const SUPABASE_ROLES: SupabaseRole[] = [
+  'student',
+  'teacher',
+  'homeroom_teacher',
+];
 
 export class SignUpDto {
   @ApiProperty({ example: 'user@example.com', format: 'email' })
@@ -15,4 +23,9 @@ export class SignUpDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @ApiPropertyOptional({ enum: SUPABASE_ROLES, example: 'student' })
+  @IsOptional()
+  @IsIn(SUPABASE_ROLES)
+  role?: SupabaseRole;
 }

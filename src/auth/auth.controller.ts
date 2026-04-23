@@ -1,14 +1,19 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { AccessToken } from './decorators/access-token.decorator';
 import { LoginDto } from './dto/login.dto';
+import { SetRoleDto } from './dto/set-role.dto';
 import { SignUpDto } from './dto/signup.dto';
+import { SupabaseAuthGuard } from './guards/supabase-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -29,5 +34,18 @@ export class AuthController {
   @ApiBadRequestResponse({ description: 'Invalid credentials or Supabase error.' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('me/role')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Set my role in user_metadata (student/teacher/homeroom_teacher)',
+  })
+  @ApiOkResponse({ description: 'Role persisted to user_metadata.' })
+  @ApiBadRequestResponse({ description: 'Supabase error while updating user.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token.' })
+  setMyRole(@AccessToken() accessToken: string, @Body() dto: SetRoleDto) {
+    return this.authService.setRole(accessToken, dto.role);
   }
 }

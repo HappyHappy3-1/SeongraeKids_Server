@@ -215,6 +215,19 @@ export class PortfolioService {
     client: SupabaseClient,
     userId: string,
   ): Promise<string> {
+    const { data: userData } = await client.auth.getUser();
+    const metadataRole = (
+      (userData?.user?.user_metadata as { role?: unknown } | null | undefined)
+        ?.role ?? ''
+    )
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    if (metadataRole) {
+      return metadataRole;
+    }
+
     const { data, error } = await client
       .from(this.profileTable)
       .select('role')
