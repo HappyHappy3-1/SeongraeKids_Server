@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ClassroomModule } from './classroom/classroom.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { ClassroomModule } from './classroom/classroom.module';
       envFilePath: ['.env.local', '.env'],
     }),
     AuthModule,
+    PortfolioModule,
     ClassroomModule,
   ],
   controllers: [AppController],
