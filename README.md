@@ -83,6 +83,40 @@ Check out a few resources that may come in handy when working with NestJS:
 - To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
 - Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
+## Classroom Sync
+
+This project includes a `POST /classroom/sync` endpoint that pulls Google Classroom data,
+saves it to `classroom_raw_posts`, then routes it to `notices` or `recruitment_posts`.
+
+Required environment variables:
+
+```bash
+CLASSROOM_SYNC_SECRET=your_admin_secret
+CLASSROOM_SYNC_ACTOR_PROFILE_ID=uuid_of_teacher_or_admin_profile
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+GOOGLE_CLASSROOM_ACCESS_TOKEN=your_access_token
+```
+
+If you prefer refresh-token based authentication instead of a one-off access token, you can also set:
+
+```bash
+GOOGLE_CLASSROOM_REFRESH_TOKEN=your_refresh_token
+GOOGLE_CLASSROOM_CLIENT_ID=your_oauth_client_id
+GOOGLE_CLASSROOM_CLIENT_SECRET=your_oauth_client_secret
+```
+
+The Google value you shared in chat is an OAuth 2.0 client ID, not a server access token.
+Use an access token obtained via OAuth or a service-account flow before calling the sync endpoint.
+
+Call the sync API with the secret header:
+
+```bash
+curl -X POST http://localhost:3000/classroom/sync \
+  -H "Content-Type: application/json" \
+  -H "x-classroom-sync-secret: your_admin_secret" \
+  -d '{}'
+```
+
 ## Support
 
 Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
