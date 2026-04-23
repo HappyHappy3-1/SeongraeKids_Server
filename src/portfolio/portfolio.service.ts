@@ -12,11 +12,11 @@ import type { PortfolioItemDto } from './dto/portfolio-item.dto';
 
 type PortfolioRow = {
   id: string;
-  student_id: string;
+  user_id: string;
   file_path: string;
-  original_name: string;
+  file_name: string;
   mime_type: string;
-  size: number;
+  file_size: number;
   uploaded_at?: string;
   created_at?: string;
 };
@@ -93,11 +93,11 @@ export class PortfolioService {
     const { data, error } = await client
       .from(this.portfolioTable)
       .insert({
-        student_id: userId,
+        user_id: userId,
         file_path: filePath,
-        original_name: file.originalname,
+        file_name: file.originalname,
         mime_type: file.mimetype,
-        size: file.size,
+        file_size: file.size,
       })
       .select('*')
       .single();
@@ -126,7 +126,7 @@ export class PortfolioService {
     const { data, error } = await client
       .from(this.portfolioTable)
       .select('*')
-      .eq('student_id', userId)
+      .eq('user_id', userId)
       .order('uploaded_at', { ascending: false });
 
     if (error) {
@@ -190,7 +190,7 @@ export class PortfolioService {
 
     const portfolio = data as PortfolioRow;
 
-    if (this.studentRoles.has(role) && portfolio.student_id !== userId) {
+    if (this.studentRoles.has(role) && portfolio.user_id !== userId) {
       throw new ForbiddenException('Students can only download their own files.');
     }
 
@@ -231,7 +231,7 @@ export class PortfolioService {
     const { data, error } = await client
       .from(this.profileTable)
       .select('role')
-      .eq('user_id', userId)
+      .eq('id', userId)
       .single();
 
     if (error || !data) {
@@ -277,10 +277,10 @@ export class PortfolioService {
   private toPortfolioItem(row: PortfolioRow): PortfolioItemDto {
     return {
       id: row.id,
-      studentId: row.student_id,
-      originalName: row.original_name,
+      studentId: row.user_id,
+      originalName: row.file_name,
       mimeType: row.mime_type,
-      size: row.size,
+      size: row.file_size,
       uploadedAt: row.uploaded_at ?? row.created_at ?? new Date().toISOString(),
     };
   }
