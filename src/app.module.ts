@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ClassroomModule } from './classroom/classroom.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
+import { PollsModule } from './polls/polls.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     AuthModule,
     PortfolioModule,
     ClassroomModule,
+    PollsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

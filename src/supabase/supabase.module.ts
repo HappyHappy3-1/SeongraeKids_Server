@@ -19,14 +19,16 @@ import { SupabaseService } from './supabase.service';
         const url =
           configService.get<string>('SUPABASE_URL') ??
           configService.get<string>('NEXT_PUBLIC_SUPABASE_URL');
-        const anonKey =
-          configService.get<string>('SUPABASE_ANON_KEY') ??
-          configService.get<string>('NEXT_PUBLIC_SUPABASE_ANON_KEY') ??
-          configService.get<string>('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+        const apiKey = [
+          configService.get<string>('SUPABASE_SERVICE_ROLE_KEY'),
+          configService.get<string>('SUPABASE_ANON_KEY'),
+          configService.get<string>('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+          configService.get<string>('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'),
+        ].find((candidate) => isUsableSupabaseKey(candidate));
 
-        if (!url || !anonKey) {
+        if (!url || !apiKey) {
           throw new Error(
-            'SUPABASE_URL and SUPABASE_ANON_KEY must be set. NEXT_PUBLIC_SUPABASE_* keys are also supported as fallback.',
+            'SUPABASE_URL and a Supabase API key must be set. SUPABASE_SERVICE_ROLE_KEY is preferred; NEXT_PUBLIC_SUPABASE_* keys are also supported as fallback.',
           );
         }
 
@@ -36,7 +38,7 @@ import { SupabaseService } from './supabase.service';
           throw new Error(`Invalid SUPABASE_URL: ${url}`);
         }
 
-        return createClient(url, anonKey);
+        return createClient(url, apiKey);
       },
     },
     {
@@ -83,3 +85,20 @@ import { SupabaseService } from './supabase.service';
   exports: [SUPABASE_CLIENT, SUPABASE_ADMIN_CLIENT, SupabaseService, SupabaseAdminService],
 })
 export class SupabaseModule {}
+
+function isUsableSupabaseKey(value?: string | null) {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return ![
+    'your_supabase_service_role_key',
+    'your_supabase_anon_key',
+    'your_supabase_publishable_key',
+  ].includes(normalized);
+}
