@@ -113,6 +113,12 @@ type SyncResult =
       skipped: true;
     };
 
+type SyncWarning = {
+  courseId: string;
+  endpoint: string;
+  message: string;
+};
+
 @Injectable()
 export class ClassroomService {
   private readonly logger = new Logger(ClassroomService.name);
@@ -128,6 +134,7 @@ export class ClassroomService {
       this.ensureWriteCredentials();
     }
 
+    const warnings: SyncWarning[] = [];
     const courses = await this.fetchCourses();
     const filteredCourses = courseIds?.length
       ? courses.filter((course) => course.id && courseIds.includes(course.id))
@@ -140,8 +147,8 @@ export class ClassroomService {
         continue;
       }
 
-      const teacherNameMap = await this.fetchTeacherNameMap(course.id);
-      const posts = await this.fetchCoursePosts(course.id);
+      const teacherNameMap = await this.fetchTeacherNameMap(course.id, warnings);
+      const posts = await this.fetchCoursePosts(course.id, warnings);
 
       for (const post of posts) {
         const result = await this.persistPost(course, post, teacherNameMap, dryRun);
@@ -156,6 +163,7 @@ export class ClassroomService {
       recruitments: results.filter((result) => result.kind === 'recruitment').length,
       unknown: results.filter((result) => result.kind === 'unknown').length,
       skipped: results.filter((result) => result.kind === 'skipped').length,
+      warnings,
       results,
     };
   }
@@ -173,22 +181,34 @@ export class ClassroomService {
     return response;
   }
 
-  async fetchCoursePosts(courseId: string): Promise<ClassroomPost[]> {
+  async fetchCoursePosts(
+    courseId: string,
+    warnings: SyncWarning[] = [],
+  ): Promise<ClassroomPost[]> {
     const [announcements, courseWorks, materials] = await Promise.all([
-      this.classroomGetPaginated<ClassroomPost>(
+      this.safeClassroomGetPaginated<ClassroomPost>(
+        courseId,
+        'announcements',
         `/courses/${courseId}/announcements`,
         'announcements',
         { pageSize: 100 },
+        warnings,
       ),
-      this.classroomGetPaginated<ClassroomPost>(
+      this.safeClassroomGetPaginated<ClassroomPost>(
+        courseId,
+        'courseWork',
         `/courses/${courseId}/courseWork`,
         'courseWork',
         { pageSize: 100 },
+        warnings,
       ),
-      this.classroomGetPaginated<ClassroomPost>(
+      this.safeClassroomGetPaginated<ClassroomPost>(
+        courseId,
+        'courseWorkMaterials',
         `/courses/${courseId}/courseWorkMaterials`,
         'courseWorkMaterial',
         { pageSize: 100 },
+        warnings,
       ),
     ]);
 
@@ -208,11 +228,17 @@ export class ClassroomService {
     ];
   }
 
-  private async fetchTeacherNameMap(courseId: string) {
-    const teachers = await this.classroomGetPaginated<ClassroomTeacher>(
+  private async fetchTeacherNameMap(
+    courseId: string,
+    warnings: SyncWarning[] = [],
+  ) {
+    const teachers = await this.safeClassroomGetPaginated<ClassroomTeacher>(
+      courseId,
+      'teachers',
       `/courses/${courseId}/teachers`,
       'teachers',
       { pageSize: 100 },
+      warnings,
     );
 
     const map = new Map<string, string>();
@@ -225,6 +251,52 @@ export class ClassroomService {
     }
 
     return map;
+  }
+
+  private async safeClassroomGetPaginated<T extends Record<string, unknown>>(
+    courseId: string,
+    endpoint: string,
+    path: string,
+    listKey: string,
+    query: Record<string, string | number | boolean> = {},
+    warnings: SyncWarning[] = [],
+  ): Promise<T[]> {
+    try {
+      return await this.classroomGetPaginated<T>(path, listKey, query);
+    } catch (error) {
+      const message = this.describeClassroomError(error);
+      this.logger.warn(
+        `Skipping ${endpoint} for courseId=${courseId}: ${message}`,
+      );
+      warnings.push({
+        courseId,
+        endpoint,
+        message,
+      });
+      return [];
+    }
+  }
+
+  private describeClassroomError(error: unknown) {
+    if (error instanceof BadRequestException) {
+      const response = error.getResponse();
+      if (typeof response === 'string') {
+        return response;
+      }
+
+      if (response && typeof response === 'object') {
+        const responseMessage = (response as Record<string, unknown>).message;
+        if (typeof responseMessage === 'string') {
+          return responseMessage;
+        }
+      }
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'Unknown Classroom API error';
   }
 
   private async persistPost(

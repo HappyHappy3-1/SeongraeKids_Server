@@ -17,6 +17,10 @@ describe('ClassroomService', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('classifies recruitment posts from numbered labels', () => {
     const result = (service as any).classifyPost(
       { name: 'SW 채용의뢰 3학년' },
@@ -76,5 +80,61 @@ describe('ClassroomService', () => {
     expect(parsed.requirements).toContain('Node.js 경험');
     expect(parsed.document_deadline).toBe('2026-05-10T18:00:00.000Z');
   });
-});
 
+  it('keeps announcements and materials when courseWork is forbidden', async () => {
+    jest.spyOn(service as any, 'classroomGetPaginated').mockImplementation(
+      async (path: string) => {
+        if (path.includes('/announcements')) {
+          return [
+            {
+              id: 'announcement-1',
+              title: '공지',
+              text: '안내 사항입니다.',
+            },
+          ];
+        }
+
+        if (path.includes('/courseWorkMaterials')) {
+          return [
+            {
+              id: 'material-1',
+              title: '자료',
+              description: '참고 자료입니다.',
+            },
+          ];
+        }
+
+        if (path.includes('/courseWork')) {
+          throw new Error('Classroom API request failed: 403');
+        }
+
+        if (path.includes('/teachers')) {
+          return [
+            {
+              userId: 'teacher-1',
+              profile: {
+                name: {
+                  fullName: 'Teacher One',
+                },
+              },
+            },
+          ];
+        }
+
+        return [];
+      },
+    );
+
+    const posts = await service.fetchCoursePosts('708572935682');
+
+    expect(posts).toHaveLength(2);
+    expect(posts.map((post) => post.id)).toEqual([
+      'announcement-1',
+      'material-1',
+    ]);
+    expect(posts.map((post) => post.sourceType)).toEqual([
+      'announcement',
+      'material',
+    ]);
+  });
+});
