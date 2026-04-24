@@ -18,34 +18,29 @@ export class AuthService {
     if (!this.supabaseService.hasServiceRoleKey) return;
     const admin = this.supabaseService.createAdminClient();
 
-    // DB trigger `handle_new_user` already creates the profile row with
-    // school_email on auth.users insert. We only UPDATE role/name here —
-    // never touch school_email (unique) and never re-INSERT.
-    const update: Record<string, unknown> = {};
-    if (patch.role !== undefined) update.role = patch.role;
-    if (patch.name !== undefined) update.name = patch.name;
-    if (Object.keys(update).length === 0) return;
+    const email = patch.email?.toLowerCase().trim();
+    const name =
+      patch.name ?? (email ? email.split('@')[0] : null) ?? 'user';
+    const role = patch.role ?? 'student';
 
-    // Retry a few times in case the trigger's commit hasn't propagated to
-    // PostgREST's read path yet (eventual consistency is rare but possible).
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const { data, error } = await admin
-        .from('profiles')
-        .update(update)
-        .eq('id', userId)
-        .select('id')
-        .maybeSingle();
-      if (error) {
-        throw new BadRequestException(
-          `Failed to update profile: ${error.message}`,
-        );
-      }
-      if (data) return;
-      await new Promise((r) => setTimeout(r, 200));
+    // We don't rely on the handle_new_user trigger — it may not be
+    // installed in every environment. Upsert by id so the row exists
+    // regardless of trigger behavior.
+    const payload: Record<string, unknown> = {
+      id: userId,
+      name,
+      role,
+    };
+    if (email) payload.school_email = email;
+
+    const { error } = await admin
+      .from('profiles')
+      .upsert(payload, { onConflict: 'id' });
+    if (error) {
+      throw new BadRequestException(
+        `Failed to upsert profile: ${error.message}`,
+      );
     }
-    // Profile still missing — trigger likely rejected the row (e.g., email
-    // validation). Don't crash signup; user can still use the app and
-    // GET /profiles/me will 404 until DB state is fixed.
   }
 
   async signUp(dto: SignUpDto) {
