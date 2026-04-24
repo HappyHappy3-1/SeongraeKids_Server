@@ -19,39 +19,33 @@ export class AuthService {
     const admin = this.supabaseService.createAdminClient();
 
     // DB trigger `handle_new_user` already creates the profile row with
-    // school_email on auth.users insert, so we only UPDATE role/name here.
-    // Touching school_email risks `profiles_school_email_key` unique violations.
+    // school_email on auth.users insert. We only UPDATE role/name here —
+    // never touch school_email (unique) and never re-INSERT.
     const update: Record<string, unknown> = {};
     if (patch.role !== undefined) update.role = patch.role;
     if (patch.name !== undefined) update.name = patch.name;
     if (Object.keys(update).length === 0) return;
 
-    const { error, data } = await admin
-      .from('profiles')
-      .update(update)
-      .eq('id', userId)
-      .select('id')
-      .maybeSingle();
-    if (error) {
-      throw new BadRequestException(
-        `Failed to update profile: ${error.message}`,
-      );
-    }
-    if (!data) {
-      // Fallback: trigger didn't fire — insert minimum row.
-      const insertPayload: Record<string, unknown> = { id: userId, ...update };
-      if (patch.email) {
-        insertPayload.school_email = patch.email.toLowerCase().trim();
-      }
-      const { error: insertErr } = await admin
+    // Retry a few times in case the trigger's commit hasn't propagated to
+    // PostgREST's read path yet (eventual consistency is rare but possible).
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data, error } = await admin
         .from('profiles')
-        .insert(insertPayload);
-      if (insertErr) {
+        .update(update)
+        .eq('id', userId)
+        .select('id')
+        .maybeSingle();
+      if (error) {
         throw new BadRequestException(
-          `Failed to insert profile: ${insertErr.message}`,
+          `Failed to update profile: ${error.message}`,
         );
       }
+      if (data) return;
+      await new Promise((r) => setTimeout(r, 200));
     }
+    // Profile still missing — trigger likely rejected the row (e.g., email
+    // validation). Don't crash signup; user can still use the app and
+    // GET /profiles/me will 404 until DB state is fixed.
   }
 
   async signUp(dto: SignUpDto) {
