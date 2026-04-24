@@ -1,5 +1,7 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -9,6 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { IsString, MinLength } from 'class-validator';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -38,6 +41,12 @@ type UploadedPdfFile = {
   size: number;
   originalname: string;
 };
+
+class AddFeedbackDto {
+  @IsString()
+  @MinLength(1)
+  text!: string;
+}
 
 @ApiTags('portfolio')
 @ApiBearerAuth()
@@ -96,6 +105,53 @@ export class PortfolioController {
     @AccessToken() accessToken: string,
   ) {
     return this.portfolioService.getAllPortfoliosForTeacher(user.id, accessToken);
+  }
+
+  @Post(':portfolioId/feedback')
+  @ApiOperation({ summary: 'Add feedback to a portfolio (teacher only)' })
+  @ApiParam({ name: 'portfolioId', type: 'string', format: 'uuid' })
+  addFeedback(
+    @CurrentUser() user: AuthenticatedUser,
+    @AccessToken() accessToken: string,
+    @Param('portfolioId', new ParseUUIDPipe()) portfolioId: string,
+    @Body() dto: AddFeedbackDto,
+  ) {
+    return this.portfolioService.addFeedback(
+      accessToken,
+      user.id,
+      portfolioId,
+      dto.text,
+    );
+  }
+
+  @Get(':portfolioId/feedback')
+  @ApiOperation({ summary: 'List feedback on a portfolio' })
+  listFeedback(
+    @CurrentUser() user: AuthenticatedUser,
+    @AccessToken() accessToken: string,
+    @Param('portfolioId', new ParseUUIDPipe()) portfolioId: string,
+  ) {
+    return this.portfolioService.listFeedback(
+      accessToken,
+      user.id,
+      portfolioId,
+    );
+  }
+
+  @Delete(':portfolioId/feedback/:feedbackId')
+  @ApiOperation({ summary: 'Delete feedback (author teacher only)' })
+  deleteFeedback(
+    @CurrentUser() user: AuthenticatedUser,
+    @AccessToken() accessToken: string,
+    @Param('portfolioId', new ParseUUIDPipe()) portfolioId: string,
+    @Param('feedbackId', new ParseUUIDPipe()) feedbackId: string,
+  ) {
+    return this.portfolioService.deleteFeedback(
+      accessToken,
+      user.id,
+      portfolioId,
+      feedbackId,
+    );
   }
 
   @Get(':portfolioId/download-url')

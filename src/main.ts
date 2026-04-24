@@ -1,10 +1,38 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
+
+@Catch()
+class LoggingExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger('HttpException');
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const req = ctx.getRequest<Request>();
+    const res = ctx.getResponse<Response>();
+    const isHttp = exception instanceof HttpException;
+    const status = isHttp ? exception.getStatus() : 500;
+    const body = isHttp
+      ? exception.getResponse()
+      : { message: (exception as Error)?.message ?? 'Internal error' };
+    this.logger.warn(
+      `${req.method} ${req.originalUrl} -> ${status} ${JSON.stringify(body)}`,
+    );
+    res.status(status).json(body);
+  }
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.useGlobalFilters(new LoggingExceptionFilter());
   app.enableCors({
     origin: [
       'https://seongraekids-client.hyphen.it.com',

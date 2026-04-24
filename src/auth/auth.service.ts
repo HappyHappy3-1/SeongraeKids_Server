@@ -17,17 +17,40 @@ export class AuthService {
   ) {
     if (!this.supabaseService.hasServiceRoleKey) return;
     const admin = this.supabaseService.createAdminClient();
-    const payload: Record<string, unknown> = { id: userId };
-    if (patch.role !== undefined) payload.role = patch.role;
-    if (patch.name !== undefined) payload.name = patch.name;
-    if (patch.email !== undefined) payload.school_email = patch.email;
-    const { error } = await admin
+
+    // DB trigger `handle_new_user` already creates the profile row with
+    // school_email on auth.users insert, so we only UPDATE role/name here.
+    // Touching school_email risks `profiles_school_email_key` unique violations.
+    const update: Record<string, unknown> = {};
+    if (patch.role !== undefined) update.role = patch.role;
+    if (patch.name !== undefined) update.name = patch.name;
+    if (Object.keys(update).length === 0) return;
+
+    const { error, data } = await admin
       .from('profiles')
-      .upsert(payload, { onConflict: 'id' });
+      .update(update)
+      .eq('id', userId)
+      .select('id')
+      .maybeSingle();
     if (error) {
       throw new BadRequestException(
-        `Failed to upsert profile: ${error.message}`,
+        `Failed to update profile: ${error.message}`,
       );
+    }
+    if (!data) {
+      // Fallback: trigger didn't fire — insert minimum row.
+      const insertPayload: Record<string, unknown> = { id: userId, ...update };
+      if (patch.email) {
+        insertPayload.school_email = patch.email.toLowerCase().trim();
+      }
+      const { error: insertErr } = await admin
+        .from('profiles')
+        .insert(insertPayload);
+      if (insertErr) {
+        throw new BadRequestException(
+          `Failed to insert profile: ${insertErr.message}`,
+        );
+      }
     }
   }
 
@@ -59,7 +82,19 @@ export class AuthService {
     return {
       user: data.user,
       session: data.session,
+      requiresEmailConfirm: Boolean(data.user && !data.session),
     };
+  }
+
+  async resendConfirmation(email: string) {
+    const { error } = await this.supabaseService.client.auth.resend({
+      type: 'signup',
+      email,
+    });
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+    return { ok: true };
   }
 
   async login(dto: LoginDto) {
@@ -77,6 +112,19 @@ export class AuthService {
       user: data.user,
       session: data.session,
     };
+  }
+
+  async refresh(refreshToken: string) {
+    const { data, error } =
+      await this.supabaseService.client.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+    if (error || !data.session) {
+      throw new BadRequestException(
+        `Supabase refreshSession failed: ${error?.message ?? 'unknown'}`,
+      );
+    }
+    return { session: data.session, user: data.user };
   }
 
   async setRole(accessToken: string, role: SupabaseRole) {

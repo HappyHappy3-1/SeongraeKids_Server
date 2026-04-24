@@ -28,6 +28,24 @@ export class AuthController {
     return this.authService.signUp(dto);
   }
 
+  @Post('refresh')
+  @ApiOperation({ summary: 'Exchange refresh_token for a new session' })
+  refresh(@Body() body: { refresh_token?: string }) {
+    if (!body?.refresh_token) {
+      return Promise.reject(new Error('refresh_token is required'));
+    }
+    return this.authService.refresh(body.refresh_token);
+  }
+
+  @Post('resend-confirmation')
+  @ApiOperation({ summary: 'Resend email verification link' })
+  resendConfirmation(@Body() body: { email?: string }) {
+    if (!body?.email) {
+      return Promise.reject(new Error('email is required'));
+    }
+    return this.authService.resendConfirmation(body.email);
+  }
+
   @Post('login')
   @ApiOperation({ summary: 'Login with email + password via Supabase' })
   @ApiOkResponse({ description: 'Returns the authenticated user and session.' })

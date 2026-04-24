@@ -39,8 +39,12 @@ export class PortfolioService {
   private readonly portfolioBucket: string;
   private readonly defaultSignedUrlExpiresIn: number;
   private readonly maxFileSizeBytes: number;
-  private readonly teacherRoles = new Set(['teacher', 'homeroom_teacher']);
-  private readonly studentRoles = new Set(['student']);
+  private readonly teacherRoles = new Set(['teacher', 'admin']);
+  private readonly studentRoles = new Set([
+    'student',
+    'president',
+    'vice_president',
+  ]);
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -168,6 +172,82 @@ export class PortfolioService {
     }
 
     return (data ?? []).map((item) => this.toPortfolioItem(item as PortfolioRow));
+  }
+
+  async addFeedback(
+    accessToken: string,
+    userId: string,
+    portfolioId: string,
+    text: string,
+  ) {
+    const client = this.supabaseService.createUserClient(accessToken);
+    const role = await this.getRoleForUser(client, userId);
+    if (!this.teacherRoles.has(role)) {
+      throw new ForbiddenException('Only teachers can leave feedback.');
+    }
+    const trimmed = (text ?? '').trim();
+    if (!trimmed) {
+      throw new BadRequestException('Feedback text is required.');
+    }
+    const { data, error } = await client
+      .from('portfolio_feedbacks')
+      .insert({
+        portfolio_id: portfolioId,
+        teacher_id: userId,
+        feedback_text: trimmed,
+      })
+      .select('*')
+      .single();
+    if (error || !data) {
+      throw new BadRequestException(
+        `Failed to save feedback: ${error?.message ?? 'unknown'}`,
+      );
+    }
+    return data;
+  }
+
+  async listFeedback(
+    accessToken: string,
+    userId: string,
+    portfolioId: string,
+  ) {
+    const client = this.supabaseService.createUserClient(accessToken);
+    await this.getRoleForUser(client, userId);
+    const { data, error } = await client
+      .from('portfolio_feedbacks')
+      .select('*')
+      .eq('portfolio_id', portfolioId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      throw new BadRequestException(
+        `Failed to list feedback: ${error.message}`,
+      );
+    }
+    return data ?? [];
+  }
+
+  async deleteFeedback(
+    accessToken: string,
+    userId: string,
+    portfolioId: string,
+    feedbackId: string,
+  ) {
+    const client = this.supabaseService.createUserClient(accessToken);
+    const role = await this.getRoleForUser(client, userId);
+    if (!this.teacherRoles.has(role)) {
+      throw new ForbiddenException();
+    }
+    const { error } = await client
+      .from('portfolio_feedbacks')
+      .delete()
+      .eq('id', feedbackId)
+      .eq('portfolio_id', portfolioId);
+    if (error) {
+      throw new BadRequestException(
+        `Failed to delete feedback: ${error.message}`,
+      );
+    }
+    return { ok: true };
   }
 
   async getPortfolioDownloadUrl(

@@ -3,9 +3,12 @@ dist
 coverage
 .env
 .env.local
+.classroom-cookies.json
 .DS_Store
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.omc/
+supabase/.temp/
