@@ -36,6 +36,8 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'https://seongraekids-client.hyphen.it.com',
+      'https://seongraekidsclient.vercel.app',
+      /^https:\/\/seongraekidsclient-[a-z0-9-]+\.vercel\.app$/,
       /^http:\/\/localhost:\d+$/,
       /^http:\/\/127\.0\.0\.1:\d+$/,
     ],
