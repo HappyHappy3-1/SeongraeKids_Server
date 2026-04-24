@@ -4,8 +4,7 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --include=dev
+RUN npm ci --include=dev
 
 FROM node:22-alpine AS build
 WORKDIR /app
@@ -16,8 +15,7 @@ RUN npm run build
 FROM node:22-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
+RUN npm ci --omit=dev
 
 FROM node:22-alpine AS runtime
 WORKDIR /app

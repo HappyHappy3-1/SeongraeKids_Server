@@ -53,6 +53,43 @@ export class AuthService {
     if (dto.name) metadata.name = dto.name;
     if (dto.role) metadata.role = dto.role;
 
+    // Create user pre-confirmed via admin API so we can return a session
+    // immediately without routing through email verification.
+    if (this.supabaseService.hasServiceRoleKey) {
+      const admin = this.supabaseService.createAdminClient();
+      const { data: created, error: createErr } =
+        await admin.auth.admin.createUser({
+          email: dto.email,
+          password: dto.password,
+          email_confirm: true,
+          user_metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        });
+      if (createErr) {
+        throw new BadRequestException(createErr.message);
+      }
+      if (created.user?.id) {
+        await this.upsertProfile(created.user.id, {
+          role: dto.role ?? 'student',
+          name: dto.name ?? dto.email.split('@')[0],
+          email: dto.email,
+        });
+      }
+      const { data: signedIn, error: signInErr } =
+        await this.supabaseService.client.auth.signInWithPassword({
+          email: dto.email,
+          password: dto.password,
+        });
+      if (signInErr) {
+        throw new BadRequestException(signInErr.message);
+      }
+      return {
+        user: signedIn.user ?? created.user,
+        session: signedIn.session,
+        requiresEmailConfirm: false,
+      };
+    }
+
+    // Fallback when no service role key — relies on Supabase project settings.
     const { data, error } = await this.supabaseService.client.auth.signUp({
       email: dto.email,
       password: dto.password,
